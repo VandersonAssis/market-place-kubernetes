@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-products-api
+  labels:
+    app: pod-products-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pod-products-api
+  template:
+    metadata:
+      labels:
+        app: pod-products-api
+    spec:
+      containers:
+        - name: container-market-place-products-api
+          image: vandersonassis/market-place-products:1
+          ports:
+            - containerPort: 8000
