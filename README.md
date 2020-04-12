@@ -1,5 +1,5 @@
 # market-place-kubernetes
-This project has all the Kubernetes' configuration files.
+This project has all the Kubernetes' configuration files to all external docker images the Market Place system uses. Such as MongoDB, RabbitMQ and anything else needed.
 
 ### Technologies Used System Wide
 - Java 12
