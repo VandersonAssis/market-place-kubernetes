@@ -1,7 +1,7 @@
 # market-place-kubernetes
 This project has all the Kubernetes' configuration files to all external docker images the Market Place system uses. Such as MongoDB, RabbitMQ and anything else needed.
 
-### Introdocution
+### Introduction
 Hi! First of all, thank you very much for stopping by and know that this system is licensed under the "DO WHATEVER THE =D YOU WANNA DO" License. 
 I Vanderson Assis (assis.vanderson@gmail.com) created this system as a portifolio to show any interviewers my experience in a microservices environment. Also have in mind I'm always 
 improving my knowledge by <b>studying literally every day</b>. So at this point in time, I created this system believing this was the best approach to do it, maybe by the time you're reading this I 
