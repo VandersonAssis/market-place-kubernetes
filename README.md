@@ -17,6 +17,7 @@ So after running the Deploy commands having the Tools needed bellow, you'll be a
 Please visit the following repository to know how to consume the endpoints https://github.com/VandersonAssis/market-place-products.
 
 A little bit of context:
+
 <b>MongoDB:</b> is set up in a Replica Set Kubernete's Statefulset with three Replicas, meaning that, it's resilient and fault tolerant. So if any of the replicas 
 		 goes down or even ALL of them, the system will recover and no data will be lost. At most a hiccup on the endpoint calls IF and only IF by a miracle, 
 		 all the replicas falls at the same time.
