@@ -1,4 +1,218 @@
+# Hi! First of all, thank you very much for stopping by and know that this system is licensed under the "DO WHATEVER THE =D YOU WANNA DO WITH IT" License. 
+# I Vanderson Assis (assis.vanderson@gmail.com) created this system as a portifolio to show any interviewers my experience in a microservices environment. Also have in mind I'm always 
+# improving my knowledge by studying literally every day. So at this point in time, I created this system believing this was the best approach to do it, maybe now I think differently 
+# and would do it in another way. If you have any problem on deploying it, please get in touch through my e-mail and I'm going to be more than pleased in helping you.
+
+# Contact:
+#   name: Vanderson Assis
+#   e-mail: assis.vanderson@gmail.com
+#   linkedin: https://www.linkedin.com/in/vanderson-assis-a2541257/
+
+# Overview:
+#   So after running the Deploy commands having the Tools needed bellow, you'll be able to consume the endpoints provided by this amazing, resilient system. =] ...
+#   Please visit the following repository to know how to consume the endpoints https://github.com/VandersonAssis/market-place-products.
+#   A little bit of context:
+#     MongoDB: is set up in a Replica Set Kubernete's Statefulset with three Replicas, meaning that, it's resilient and fault tolerant. So if any of the replicas 
+#              goes down or even ALL of them, the system will recover and no data will be lost. At most a hiccup on the endpoint calls IF and only IF by a miracle, 
+#              all the replicas falls at the same time.
+    
+#     RabbitMQ: Rabbitmq is set to have two replicas, meaning if one goes down, the system will keep functioning. Even if for a really bad luck all the replicas goes down 
+#               the system will be able to recover since they're configured in a Kubernetes Statefulset and the rabbitmq data is being saved in a separated volume.
+
+#     Zipkin: Zipkin is set in a Deployment, also meaning that if it goes down, it'll get back up automatically. It's using Kafka to send its data to a mysql database. 
+#             So, again, no data loss.
+
+#     Microservices (products, sellers, purchase, orderprocessor): They're also configured in a Statefulset and having their database in the MongoDB Replica Set mentioned above.
+#                                                                  Meaning, if any of them goes down, the system will freaking recover by itself and no data loss. Amazing, isn't? =]
+
+#     Frontend: This system will have its frontend created with React, which will also be in Kubernetes with Replicas and so on. RESILIENCE MY FRIEND!
+
+# Bellow you'll see the tools and versions needed to deploy this system. Of course, if you're using newer or older versions of them, give it a shot; it'll probably work.
+# Tools:
+#   Kubectl [1.18]
+#   Minikube [version v1.9.0]
+#   Docker [version 19.03.8]
+#   Linux Ubuntu [18.04] (This deploy will probably work in any OS, but for the sake of information, this is the OS used on the development of it)
+
+# Deploy:
+#   Your Minikube should have at least 6GB of memory to use, less than this can leave the system unstable. Just to make sure, run `minikube delete` WARNING! After starting your Minikube 
+#   again, the pods will NOT start automatically! So before running it, make sure you have all the yaml files for your pods and so on.
+#   After executing the delete command then execut `minikube start --memory 6144`. By doing this, your Minikube will use up to 6GB of memory. It's important to note that you have to 
+#   DELETE your minikube in order for it to start again with 6GB available.
+
+#   Then run `minikube tunnel` command, so minikube can emulate LoadBalancer services which are used in this system's microservices.
+
+#   If you have all the above mentioned technologies installed, all you'll have to do is; clone this repository to your computer, navigate to it's location using a command line with access 
+#   to Kubectl commands and execute `kubectl create -f market-place.yaml`. Depending on the power of your machine, the system will be deployed in less than a minute or some minutes.
+#   Unfortunately by this time I couldn't make the rabbitmq PersistentVolume bind to the NFS server by it's service name, it's using IP instead. So all you have to do is:
+#   - The NFS have already been deployed on the command above mentioned. So please execute `kubectl describe pod nfs-server-pod | grep IP:`
+#   - Copy the IP address, in my case it is "172.17.0.17"
+#   - Paste the above copied IP address into the "market-place-rabbitmq.yaml" file. The property in this file that you'll have to paste the IP is the nfs server property located in 
+#     the "rabbitmq-data" PersistentVolume. Remember, you can always count on our "ctrl f" friend to locate the right spot on the "market-place-rabbitmq.yaml" file.
+#   - After pasting the IP address CORRECTLY, then run `kubectl create -f market-place-rabbitmq.yaml`. Now run the command `kubectl get pods` to list the pods and when you 
+#     have two instances of rabbitmq running (somethings like: rabbitmq-0 1/1 running and rabbitmq-1 1/1 running), then you're good to go. The system is deployed!
+   
+#   Please know that even though the deployment seems a little complex, believe me, comparing to the structure being deployed, like, a full resilient MICROSERVICES STRUCTURE, these are 
+#   some really simple steps to take.    =]
+  
+# Throubleshoot:
+#   One thing I've noticed is that in some machines, the zipkin pod doesn't connect correctly to the zipkin-mysql pod, which is the one that persists zipkin's data. If that happens to you, 
+#   please follow bellow steps:
+#     - Run `kubectl exec -it zipkin-mysql-db96f6f4-cqhk2 -- sh`. Replace the pod's name (zipkin-mysql-db96f6f4-cqhk2) to yours. To get the pod name in your machine, run `kubectl get pods` 
+#       copy and paste your zipkin-mysql pod name into the previously mentioned command
+#     - Then run `mysql -u zipkin -p` and on the password, type zipkin
+#     - Then run `show databases;`
+#     - After that exit the pod by running `exit` command twice.
+#     - Run kubectl get pods again in around 10 secs. If zipkin pod still didn't start correctly then
+#     - Delete the zipkin pod by running `kubectl delete pods zipkin-7f4d9b5487-qbwsz`. Again, replacing the pod's name by yours.
+#     - After you delete the pod, the deploy will take care of starting another one and this time it will start correctly. If it doesn't, reach out to me! =]
+
+#   Also, for NOW some of the ports had to be configured as statics, which can clash with the ports you're probably already using on your stuff. A next version of this system
+#   will have totally dynamic ports. I believe that changing it right now to dynamic, will not break anything, but since I don't have the time now to make sure of it, please 
+#   keep it as it is.
+
+#BEGIN Configuring Microservices Communication Roles
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: default
+  name: namespace-reader
+rules:
+  - apiGroups: ["", "extensions", "apps"]
+    resources: ["configmaps", "pods", "services", "endpoints", "secrets"]
+    verbs: ["get", "list", "watch"]
+
 ---
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: namespace-reader-binding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: default
+    apiGroup: ""
+roleRef:
+  kind: Role
+  name: namespace-reader
+  apiGroup: ""
+#END Configuring Microservices Communication Roles
+
+---
+
+#BEGIN MongoDB Replicaset Deployment
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: default
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - services
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: default
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: system:serviceaccount:default:default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: default
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: default
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: market-place-mongodb
+spec:
+  selector:
+    matchLabels:
+      app: market-place-mongodb
+  serviceName: "market-place-mongodb"
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: market-place-mongodb
+        role: market-place-mongodb
+        environment: test
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: market-place-mongodb
+          image: mongo:4.2.1
+          command:
+            - mongod
+            - "--bind_ip_all"
+            - "--replSet"
+            - rs0
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: market-place-mongodb
+              mountPath: /data/db      
+        - name: mongo-sidecar
+          image: cvallance/mongo-k8s-sidecar
+          env:
+            - name: MONGO_SIDECAR_POD_LABELS
+              value: "role=market-place-mongodb,environment=test"
+            - name: KUBERNETES_MONGO_SERVICE_NAME
+              value: market-place-mongodb
+      volumes:
+        - name: market-place-mongodb
+  volumeClaimTemplates:
+    - metadata:
+        name: market-place-mongodb        
+      spec:
+        accessModes: 
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-place-mongodb
+  labels:
+    app: market-place-mongodb
+spec:
+  ports:
+    - port: 27017
+      targetPort: 27017
+  clusterIP: None
+  selector:
+    role: market-place-mongodb
+#END MongoDB Replicaset Deployment
+
+---
+
+#BEGIN Zipkin Deployment
 apiVersion: "v1"
 kind: "List"
 items:
@@ -489,3 +703,317 @@ items:
         - emptyDir:
             medium: "Memory"
           name: "log"
+#END Zipkin Deployment
+
+---
+
+#BEGIN RabbitMQ NFS Server Deployment
+kind: Pod
+apiVersion: v1
+metadata:
+  name: nfs-server-pod
+  labels:
+    role: nfs
+spec:
+  containers:
+    - name: nfs-server-container
+      image: cpuguy83/nfs-server
+      securityContext:
+        privileged: true
+      args:
+        # Pass the paths to share to the Docker image
+        - /exports
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-service
+spec:
+  selector:
+    role: nfs
+  ports:
+    # Open the ports required by the NFS server
+    # Port 2049 for TCP
+    - name: tcp-2049
+      port: 2049
+      protocol: TCP
+
+    # Port 111 for UDP
+    - name: udp-111
+      port: 111
+      protocol: UDP
+#END RabbitMQ NFS Server Deployment
+
+---
+
+#BEGIN Products API Deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: market-place-products
+data:
+  application.properties: |-
+    spring.zipkin.baseUrl=http://zipkin:9411/
+    spring.data.mongodb.uri=mongodb://market-place-mongodb-0.market-place-mongodb,market-place-mongodb-1.market-place-mongodb,market-place-mongodb-2.market-place-mongodb/products-db?serverSelectionTimeoutMS=10000&connectTimeoutMS=20000
+    ribbon.http.client.enabled= true
+    hystrix.command.default.execution.timeout.enabled=false
+    api-gateway.application.name=market-place-api-gateway
+    ribbon.ConnectTimeout=100000
+    ribbon.ReadTimeout=100000
+    sellers.spring.application.name=market-place-sellers
+    sellers-service.url=http://market-place-sellers
+    spring.jackson.default-property-inclusion=NON_NULL
+    spring.mvc.throw-exception-if-no-handler-found=TRUE
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-place-products
+spec:
+  selector:
+    app: market-place-products
+  ports:
+    - protocol: TCP
+      port: 8080
+      nodePort: 30084
+  type: LoadBalancer
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-place-products
+spec:
+  selector:
+    matchLabels:
+      app: market-place-products
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: market-place-products
+    spec:
+      containers:
+        - name: market-place-products
+          image: vandersonassis/market-place-products:1
+          env:
+            - name: "KUBERNETES_NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "metadata.namespace"
+          ports:
+            - containerPort: 8080
+#END Products API Deployment
+
+---
+
+#BEGIN Sellers API Deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: market-place-sellers
+data:
+  application.properties: |-
+    spring.data.mongodb.uri=mongodb://market-place-mongodb-0.market-place-mongodb,market-place-mongodb-1.market-place-mongodb,market-place-mongodb-2.market-place-mongodb/products-db?serverSelectionTimeoutMS=10000&connectTimeoutMS=20000
+    spring.zipkin.baseUrl=http://zipkin:9411/
+    spring.application.name=market-place-sellers
+    spring.jackson.default-property-inclusion=NON_NULL
+    spring.mvc.throw-exception-if-no-handler-found=true
+    api-gateway.application.name=market-place-api-gateway
+    products-service.url=http://market-place-products
+    hystrix.command.default.execution.timeout.enabled=false
+    ribbon.ReadTimeout=100000
+    ribbon.ConnectTimeout=100000
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-place-sellers
+spec:
+  selector:
+    app: market-place-sellers
+  ports:
+    - protocol: TCP
+      port: 8080
+      nodePort: 30085
+  type: LoadBalancer
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-place-sellers
+spec:
+  selector:
+    matchLabels:
+      app: market-place-sellers
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: market-place-sellers
+    spec:
+      containers:
+        - name: market-place-sellers
+          image: vandersonassis/market-place-sellers:1
+          env:
+            - name: "KUBERNETES_NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "metadata.namespace"
+          ports:
+            - containerPort: 8080
+
+#END Sellers API Deployment
+
+---
+
+#BEGIN Purchase API Deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: market-place-purchase
+data:
+  application.properties: |-
+    spring.application.name=market-place-purchase
+    spring.zipkin.baseUrl=http://zipkin:9411/
+    spring.rabbitmq.addresses=rabbitmq-0.rabbitmq-headless:5672,rabbitmq-1.rabbitmq-headless:5672
+    spring.data.mongodb.uri=mongodb://market-place-mongodb-0.market-place-mongodb,market-place-mongodb-1.market-place-mongodb,market-place-mongodb-2.market-place-mongodb/products-db?serverSelectionTimeoutMS=10000&connectTimeoutMS=20000
+    api-gateway.application.name=market-place-api-gateway
+    products-service.url=http://market-place-products
+    spring.jackson.default-property-inclusion=NON_NULL
+    spring.mvc.throw-exception-if-no-handler-found=true
+    spring.rabbitmq.listener.simple.retry.enabled=true
+    spring.rabbitmq.listener.simple.retry.initial-interval=1000
+    spring.rabbitmq.listener.simple.retry.max-attempts=3
+    spring.rabbitmq.listener.simple.retry.max-interval=10000
+    spring.rabbitmq.listener.simple.retry.multiplier=2.0
+    spring.rabbitmq.listener.simple.retry.stateless=true
+    amqp.mppu.process.order.queue=mppu.process.order
+    amqp.mppu.process.order.queue.ex=mppu.process.order.ex
+    amqp.mppu.process.order.dlq=mppu.process.order.dlq
+    amqp.mppu.process.order.dlx=mppu.process.order.dlx
+    amqp.mppu.process.order.routing.key=PROCESS_ORDER
+    amqp.mpop.order.processed.queue=mpop.order.processed
+    hystrix.command.default.execution.timeout.enabled=false
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-place-purchase
+spec:
+  selector:
+    app: market-place-purchase
+  ports:
+    - protocol: TCP
+      port: 8080
+      nodePort: 30086
+  type: LoadBalancer
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-place-purchase
+spec:
+  selector:
+    matchLabels:
+      app: market-place-purchase
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: market-place-purchase
+    spec:
+      containers:
+        - name: market-place-purchase
+          image: vandersonassis/market-place-purchase:1
+          env:
+            - name: "KUBERNETES_NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "metadata.namespace"
+          ports:
+            - containerPort: 8080
+#END Purchase API Deployment
+
+---
+
+#BEGIN Order Processor API Deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: market-place-orderprocessor
+data:
+  application.properties: |-
+    spring.application.name=market-place-orderprocessor
+    spring.rabbitmq.addresses=rabbitmq-0.rabbitmq-headless:5672,rabbitmq-1.rabbitmq-headless:5672
+    spring.rabbitmq.listener.simple.retry.enabled=true
+    spring.rabbitmq.listener.simple.retry.initial-interval=1000
+    spring.rabbitmq.listener.simple.retry.max-attempts=3
+    spring.rabbitmq.listener.simple.retry.max-interval=10000
+    spring.rabbitmq.listener.simple.retry.multiplier=2.0
+    spring.rabbitmq.listener.simple.retry.stateless=true
+    amqp.mpop.order.processed.queue=mpop.order.processed
+    amqp.mpop.order.processed.ex=mpop.order.processed.ex
+    amqp.mpop.order.processed.dlq=mpop.order.processed.dlq
+    amqp.mpop.order.processed.dlx=mpop.order.processed.dlx
+    amqp.mpop.order.processed.routing.key=ORDER_PROCESSED
+    amqp.mppu.process.order.queue=mppu.process.order
+    hystrix.command.default.execution.timeout.enabled=false
+    ribbon.ReadTimeout=100000
+    ribbon.ConnectTimeout=100000
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-place-orderprocessor
+spec:
+  selector:
+    app: market-place-orderprocessor
+  ports:
+    - protocol: TCP
+      port: 8080
+      nodePort: 30087
+  type: LoadBalancer
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-place-orderprocessor
+spec:
+  selector:
+    matchLabels:
+      app: market-place-orderprocessor
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: market-place-orderprocessor
+    spec:
+      containers:
+        - name: market-place-orderprocessor
+          image: vandersonassis/market-place-orderprocessor:1
+          env:
+            - name: "KUBERNETES_NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "metadata.namespace"
+          ports:
+            - containerPort: 8080
+#END Order Processor API Deployment
