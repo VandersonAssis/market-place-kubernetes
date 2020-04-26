@@ -3,7 +3,7 @@ This project has all the Kubernetes' configuration files to all external docker 
 
 ### Introduction
 Hi! First of all, thank you very much for stopping by and know that this system is licensed under the "DO WHATEVER THE =D YOU WANNA DO" License. 
-I Vanderson Assis (assis.vanderson@gmail.com) created this system as a portifolio to show any interviewers my experience in a microservices environment. Also have in mind I'm always 
+I Vanderson Assis (assis.vanderson@gmail.com) created this system as a portifolio to show any interviewers my experience in a microservices (high scalable) environment. Also have in mind I'm always 
 improving my knowledge by <b>studying literally every day</b>. So at this point in time, I created this system believing this was the best approach to do it, maybe by the time you're reading this I 
 already think differently and would do it in another way. If you have any problem on deploying it, please get in touch through my e-mail and I'm going to be more than pleased in helping you.
 
